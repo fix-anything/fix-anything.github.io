@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FixAnything — Stage I</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="figs/fig.css">
+<style>
+.pipe{display:flex; align-items:center; justify-content:center; gap:.7cqw}
+.vid{width:17cqw}
+.arw{flex:0 0 2.4cqw; margin-top:-2cqw}
+
+/* VAE trapezoids */
+.vae{position:relative; width:5.4cqw; height:11.4cqw; background:var(--accent-soft);
+  border:1px solid var(--line-2); display:grid; place-items:center}
+.vae.enc{clip-path:polygon(0 0,100% 12%,100% 88%,0 100%)}
+.vae.dec{clip-path:polygon(0 12%,100% 0,100% 100%,0 88%)}
+.vae span{font-family:var(--mono); font-size:1.25cqw; writing-mode:vertical-rl; transform:rotate(180deg); letter-spacing:.03em}
+
+/* stacked tiles */
+.stacks{display:flex; flex-direction:column; gap:.9cqw}
+.stk{display:flex; flex-direction:column; align-items:center; gap:.35cqw}
+.tiles{position:relative; width:7cqw; height:4.6cqw}
+.tiles>*{position:absolute; width:5.5cqw; height:3.6cqw; border:1px solid var(--ink); border-radius:1px; display:block}
+.tiles>*:nth-child(1){left:1.5cqw; top:0}
+.tiles>*:nth-child(2){left:.75cqw; top:.5cqw}
+.tiles>*:nth-child(3){left:0; top:1cqw}
+.tiles i{background:#111}
+.tiles i.keep{background:#fff}
+
+/* one Video-DiT box, per the talk slide */
+.dit{display:flex; flex-direction:column; align-items:center; gap:.45cqw}
+.lora{display:flex; align-items:center; gap:.35cqw; font-family:var(--mono); font-size:1.25cqw;
+  padding:.26cqw .6cqw; border-radius:4px; background:rgba(200,87,31,.1);
+  border:1px solid rgba(200,87,31,.38); color:var(--fire)}
+.flame{animation:flicker 2.2s ease-in-out infinite}
+@keyframes flicker{0%,100%{opacity:.6} 50%{opacity:1}}
+.ditbox{width:10cqw; height:10cqw; border-radius:6px; background:#fff; border:1px solid var(--line-2);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5cqw;
+  font-family:var(--display); font-weight:600; font-size:1.78cqw; line-height:1.15; text-align:center}
+.ditbox small{font-family:var(--mono); font-weight:400; font-size:1.15cqw; color:var(--faint)}
+</style>
+</head>
+<body>
+
+<div class="stage-fig" id="fig">
+  <button class="sf-pause" id="pause">❚❚ pause</button>
+  <div class="sf-head">
+    <span class="sf-kicker">Stage I —</span><span class="sf-title">Supervised finetuning</span>
+  </div>
+
+  <div class="pipe">
+
+    <div class="node">
+      <div class="vid" id="in-stack"><span class="chip" id="chip-in">3DGS render</span></div>
+      <div class="cap"><b>Input video</b></div>
+    </div>
+
+    <div class="arw"><span class="p"></span></div>
+
+    <div class="node">
+      <div class="vae enc"><span>VAE Encoder</span></div>
+      <svg class="ico" viewBox="0 0 24 24"><path d="M12 1.6v20.8M12 1.6 9.6 4M12 1.6 14.4 4M12 22.4l-2.4-2.4M12 22.4l2.4-2.4M3 6.8l18 10.4M3 6.8l.3 3.3M3 6.8l3.2-.9M21 17.2l-.3-3.3M21 17.2l-3.2.9M21 6.8 3 17.2M21 6.8l-3.2-.9M21 6.8l-.3 3.3M3 17.2l3.2.9M3 17.2l.3-3.3" stroke="var(--frost)" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+    </div>
+
+    <div class="arw"><span class="p" style="animation-delay:.35s"></span></div>
+
+    <div class="node stacks">
+      <div class="stk">
+        <div class="tiles"><img src="figs/stage1/noise.png" alt=""><img src="figs/stage1/noise.png" alt=""><img src="figs/stage1/noise.png" alt=""></div>
+        <div class="cap">noise</div>
+      </div>
+      <div class="stk">
+        <div class="tiles"><img src="figs/stage1/latent.png" alt=""><img src="figs/stage1/latent.png" alt=""><img src="figs/stage1/latent.png" alt=""></div>
+        <div class="cap">cond. latents</div>
+      </div>
+      <div class="stk">
+        <div class="tiles"><i></i><i></i><i class="keep"></i></div>
+        <div class="cap">binary mask</div>
+      </div>
+    </div>
+
+    <div class="arw"><span class="p" style="animation-delay:.7s"></span></div>
+
+    <div class="node dit">
+      <span class="lora"><svg class="ico flame" viewBox="0 0 24 24"><path d="M13.5 1.5c1.6 4.2-1.2 6.3-2.7 8-1.7 1.9-2 3.6-1.2 5.1.6 1.2 1.9 1.9 3.2 1.6-2.4 2.2-6.6.9-7.6-2.4C4 10.4 6.6 7.2 9 5c1.9-1.7 3.9-2.6 4.5-3.5Z" fill="var(--fire)"/><path d="M15.4 9.6c2.6 2 3.6 4.4 3 6.6-.7 2.7-3.3 4.6-6.4 4.6 1.4-1 2-2.2 1.8-3.6-.2-1.3-1.1-2-1.1-3.3 0-1.4.9-2.6 2.7-4.3Z" fill="var(--fire)" opacity=".65"/></svg>LoRA</span>
+      <div class="ditbox">Video-DiT<small>base frozen</small></div>
+    </div>
+
+    <div class="arw"><span class="p" style="animation-delay:1.05s"></span></div>
+
+    <div class="node">
+      <div class="tiles"><img src="figs/stage1/latent.png" alt=""><img src="figs/stage1/latent.png" alt=""><img src="figs/stage1/latent.png" alt=""></div>
+      <div class="cap">denoised<br>latents</div>
+    </div>
+
+    <div class="arw"><span class="p" style="animation-delay:1.4s"></span></div>
+
+    <div class="node">
+      <div class="vae dec"><span>VAE Decoder</span></div>
+      <svg class="ico" viewBox="0 0 24 24"><path d="M12 1.6v20.8M12 1.6 9.6 4M12 1.6 14.4 4M12 22.4l-2.4-2.4M12 22.4l2.4-2.4M3 6.8l18 10.4M3 6.8l.3 3.3M3 6.8l3.2-.9M21 17.2l-.3-3.3M21 17.2l-3.2.9M21 6.8 3 17.2M21 6.8l-3.2-.9M21 6.8l-.3 3.3M3 17.2l3.2.9M3 17.2l.3-3.3" stroke="var(--frost)" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+    </div>
+
+    <div class="arw"><span class="p" style="animation-delay:1.75s"></span></div>
+
+    <div class="node">
+      <div class="vid out" id="out-stack"><span class="chip" style="color:var(--accent)">FixAnything output</span></div>
+      <div class="cap"><b>Output target video</b></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+if (new URLSearchParams(location.search).get('embed')) document.querySelector('.sf-head').style.display='none';
+
+var REPS = [
+  { key:'3dgs',   label:'3DGS render' },
+  { key:'nerf',   label:'NeRF render' },
+  { key:'mesh',   label:'Mesh render' },
+  { key:'points', label:'Sparse-point render' }
+];
+var inStack=document.getElementById('in-stack'), outStack=document.getElementById('out-stack');
+var chip=document.getElementById('chip-in'), ins=[], outs=[], idx=0;
+
+REPS.forEach(function(r){
+  [['in',inStack,ins],['out',outStack,outs]].forEach(function(t){
+    var v=document.createElement('video');
+    v.src='figs/stage1/'+t[0]+'_'+r.key+'.mp4';
+    v.muted=true; v.loop=true; v.playsInline=true; v.preload=(r===REPS[0]&&t[0]==='in')?'auto':'metadata'; v.style.opacity=0;
+    v.style.transition='opacity .35s ease';
+    t[1].appendChild(v); t[2].push(v);
+  });
+});
+
+function show(i){
+  [ins,outs].forEach(function(list){
+    list.forEach(function(v,k){
+      var on = k===i;
+      v.style.opacity = on ? 1 : 0;
+      if (on){ try{ v.currentTime=0; }catch(e){} v.play().catch(function(){}); } else v.pause();
+    });
+  });
+  chip.textContent = REPS[i].label;
+}
+
+/* detect the loop by the playhead wrapping — timeupdate can miss the tail */
+var last = 0, playing = true;
+setInterval(function(){
+  if (!playing) return;
+  var v = ins[idx]; if (!v) return;
+  var t = v.currentTime;
+  if (t + 0.05 < last){ idx = (idx+1) % REPS.length; show(idx); last = 0; return; }
+  last = t;
+}, 120);
+
+var btn = document.getElementById('pause');
+btn.addEventListener('click', function(){
+  playing = !playing;
+  btn.innerHTML = playing ? '❚❚ pause' : '▶ play';
+  [ins[idx], outs[idx]].forEach(function(v){
+    if (!v) return;
+    if (playing) v.play().catch(function(){}); else v.pause();
+  });
+});
+
+show(0);
+window.addEventListener('load', function(){
+  var f=document.getElementById('fig');
+  document.title='ratio '+f.offsetWidth+'x'+f.offsetHeight;
+});
+</script>
+</body>
+</html>

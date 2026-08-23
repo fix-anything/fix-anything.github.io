@@ -1,1 +1,1044 @@
-Hello World!
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="FixAnything: 3D-Consistent Rendering Refinement via Video Generative Priors. One video model repairs rendering artifacts from 3DGS, NeRF, mesh, or sparse point clouds.">
+<title>FixAnything — 3D-Consistent Rendering Refinement via Video Generative Priors</title>
+<link rel="canonical" href="https://fix-anything.github.io/">
+<meta name="theme-color" content="#faf9f6">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://fix-anything.github.io/">
+<meta property="og:title" content="FixAnything: 3D-Consistent Rendering Refinement via Video Generative Priors">
+<meta property="og:description" content="One video model repairs rendering artifacts from 3DGS, NeRF, mesh, or sparse point clouds. ECCV 2026, Carnegie Mellon University.">
+<meta property="og:image" content="https://fix-anything.github.io/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="FixAnything: 3D-Consistent Rendering Refinement via Video Generative Priors">
+<meta name="twitter:description" content="One video model repairs rendering artifacts from 3DGS, NeRF, mesh, or sparse point clouds. ECCV 2026, CMU.">
+<meta name="twitter:image" content="https://fix-anything.github.io/og.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%231a1a18'%3E%3Crect x='2' y='2' width='5' height='5' rx='1'/%3E%3Crect x='9.5' y='2' width='5' height='5' rx='1'/%3E%3Crect x='17' y='2' width='5' height='5' rx='1'/%3E%3Crect x='2' y='9.5' width='5' height='5' rx='1'/%3E%3Crect x='9.5' y='9.5' width='5' height='5' rx='1' fill='%232e5aac'/%3E%3Crect x='17' y='9.5' width='5' height='5' rx='1'/%3E%3Crect x='2' y='17' width='5' height='5' rx='1'/%3E%3Crect x='9.5' y='17' width='5' height='5' rx='1'/%3E%3Crect x='17' y='17' width='5' height='5' rx='1'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════ tokens ═══════════════ */
+:root{
+  --bg:#faf9f6;          /* warm paper — same canvas as khiemvuong.com */
+  --bg-2:#f2efe6;
+  --card:#ffffff;
+  --line:#ddd7c9;
+  --line-2:#cbc4b2;
+
+  --ink:#1a1a18;
+  --dim:#3a3a36;
+  --faint:#6f6c62;
+
+  --accent:#2e5aac;      /* labels, active state, "ours" */
+  --accent-soft:rgba(46,90,172,.07);
+  --flaw:#b3401f;        /* baseline / before */
+
+  --gs:#3F7D6E; --nerf:#7A6BA8; --mesh:#A8722A; --pts:#8B4A6B;
+
+  --display:"Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --body:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono:"Space Mono", "SF Mono", Menlo, monospace;
+
+  --maxw:1120px;
+  --r:11px;
+}
+*,*::before,*::after{margin:0; padding:0; box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:74px}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--body);
+  font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+img,video{max-width:100%; display:block}
+a{color:inherit; text-decoration:none}
+::selection{background:var(--accent); color:#fff}
+sup{font-size:.66em; line-height:0}
+sup.eq{font-size:1.15em; font-weight:400; color:var(--accent); vertical-align:baseline;
+  margin-left:.06em; line-height:0}
+
+.container{max-width:var(--maxw); margin:0 auto; padding:0 30px}
+h1,h2,h3{font-family:var(--display); font-weight:600; line-height:1.15; letter-spacing:-0.022em}
+p{color:var(--dim)}
+p b,p strong{color:var(--ink); font-weight:700}
+em{font-style:italic}
+
+section{padding:44px 0; border-top:1px solid var(--line)}
+
+/* ═══════════════ motif: noisy cells snapping into a grid ═══════════════ */
+.motif{display:inline-block; line-height:0}
+.motif rect{fill:currentColor}
+.motif g[class^="j"]{transform-box:fill-box; transform-origin:50% 50%}
+.motif .j1{animation:j1 3.8s ease-in-out infinite}
+.motif .j2{animation:j2 3.8s ease-in-out infinite}
+.motif .j3{animation:j3 3.8s ease-in-out infinite}
+@keyframes j1{0%,56%{transform:translate(2.6px,-2.2px) rotate(18deg); opacity:.3} 74%,100%{transform:none; opacity:1}}
+@keyframes j2{0%,56%{transform:translate(-3px,2.4px) rotate(-22deg); opacity:.28} 78%,100%{transform:none; opacity:1}}
+@keyframes j3{0%,56%{transform:translate(1.8px,3px) rotate(26deg); opacity:.28} 82%,100%{transform:none; opacity:1}}
+@media (prefers-reduced-motion:reduce){.motif *{animation:none!important}}
+
+/* ═══════════════ nav ═══════════════ */
+.topnav{position:sticky; top:0; z-index:50; background:rgba(250,249,246,.82); backdrop-filter:saturate(180%) blur(16px); border-bottom:1px solid var(--line)}
+.topnav__inner{max-width:var(--maxw); margin:0 auto; padding:.62rem 30px; display:flex; align-items:center; justify-content:space-between; gap:1.4rem}
+.topnav__brand{font-family:var(--display); font-size:1.02rem; font-weight:600; display:inline-flex; align-items:center; gap:.5em; letter-spacing:-0.015em; flex-shrink:0}
+.topnav__links{display:flex; align-items:center; gap:.15rem; min-width:0}
+.topnav__links a{font-family:var(--mono); font-size:.68rem; letter-spacing:0; color:var(--dim); padding:.36rem .55rem; border-radius:6px; white-space:nowrap}
+.topnav__links a:hover{background:var(--bg-2); color:var(--ink)}
+.topnav__links a.on{color:var(--accent)}
+.topnav__cta{display:inline-flex; align-items:center; gap:.4em; background:var(--ink); color:var(--bg); font-family:var(--mono); font-size:.72rem; padding:.44rem .8rem; border-radius:7px; flex-shrink:0}
+.topnav__cta:hover{background:var(--accent)}
+@media(max-width:1040px){.topnav__links{display:none}}
+
+/* ═══════════════ hero (centered, moodio-style) ═══════════════ */
+.hero{padding:46px 0 4px; border-top:none; text-align:center}
+.affil{font-size:1.02rem; color:var(--ink); margin-top:.5rem}
+.eqnote{font-size:.8rem; color:var(--faint); margin-top:.22rem}
+.venue{font-family:var(--display); font-size:1rem; font-weight:500; color:var(--dim); margin-top:.95rem}
+.hero__title{font-size:clamp(1.85rem,3.9vw,2.75rem); font-weight:600; max-width:940px; margin:0 auto 1.35rem; line-height:1.13}
+.hero__title .name{font-weight:600}
+.authors{font-size:1.12rem; max-width:860px; margin:0 auto; color:var(--ink); line-height:1.5}
+.authors a{color:var(--accent); font-weight:600}
+.authors a:hover{text-decoration:underline}
+
+.hero__links{display:flex; justify-content:center; flex-wrap:wrap; gap:.6rem; margin-top:1.5rem}
+.hero__links a{display:inline-flex; align-items:center; gap:.5em; background:var(--ink); color:var(--bg); font-family:var(--mono); font-size:.78rem; padding:.6rem 1.05rem; border-radius:8px; transition:background .15s}
+.hero__links a:hover{background:var(--accent)}
+.hero__links a svg{width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.7}
+.hero__links a[data-todo]{background:transparent; color:var(--faint); border:1px solid var(--line-2)}
+
+/* callout — accent bar, used for the one-line finding */
+.callout{border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 8px 8px 0; padding:.9rem 1.2rem; text-align:left; margin:.1rem 0 0; font-size:1rem; color:var(--ink)}
+.callout .lbl{font-family:var(--body); font-style:italic; font-size:1.02rem; font-weight:600; letter-spacing:0; text-transform:none; color:var(--accent); display:block; margin-bottom:.2rem}
+
+/* ═══════════════ section chrome ═══════════════ */
+.sec-head{display:flex; align-items:stretch; margin-bottom:1.05rem}
+.sec-chip{display:inline-block; background:var(--ink); color:#fff; padding:.32em .75em;
+  font-family:var(--mono); font-size:1.02rem; font-weight:400; letter-spacing:-0.01em; line-height:1.25}
+.sec-chip .no{opacity:.55; font-variant-numeric:tabular-nums; margin-right:.15em}
+
+/* ═══════════════ full-measure prose — lines run left → right across the
+   whole content width; no newspaper column flow ═══════════════ */
+.prose-wide{margin-top:1.1rem}
+.prose-wide p{color:var(--ink); font-size:1.04rem; line-height:1.68; text-align:justify; hyphens:auto}
+.prose-wide p+p{margin-top:1rem}
+@media(max-width:880px){.prose-wide p{text-align:left; hyphens:manual}}
+
+.block{margin-top:1.9rem}
+.block:first-child{margin-top:0}
+.block__title{font-family:var(--mono); font-size:1rem; font-weight:700; color:var(--ink);
+  letter-spacing:-0.01em; margin-bottom:.45rem}
+.block__lead{font-size:1.02rem; line-height:1.72}
+.block .viewer{margin-top:1.1rem}
+
+.anchors{margin-top:1.3rem}
+.anchors__rule{position:relative; text-align:center; margin-bottom:1rem}
+.anchors__rule::before{content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:var(--line)}
+.anchors__title{position:relative; display:inline-block; background:var(--card); padding:0 .95rem;
+  font-family:var(--mono); font-size:.74rem; color:var(--dim)}
+.anchor-row{display:flex; align-items:center; gap:.7rem}
+.anchor{flex:1 1 0; margin:0; min-width:0}
+.anchor img{width:100%; border-radius:6px; background:#111; aspect-ratio:560/324; object-fit:cover}
+@media(max-width:640px){
+  .anchor-dots{display:none}
+  .anchor-row{gap:.5rem}
+  .anchor figcaption{font-size:.6rem}
+}
+.anchor figcaption{font-family:var(--mono); font-size:.7rem; color:var(--faint); margin-top:.45rem; text-align:center}
+.anchor.clean figcaption{color:var(--accent)}
+.anchor-dots{flex:0 0 auto; font-family:var(--mono); font-size:1rem; color:var(--line-2); letter-spacing:.06em}
+.anchors .caption{margin-top:.8rem}
+
+.stage-block{margin-top:1.9rem}
+.stage-block .sec-head{margin-bottom:.5rem}
+.stage-title{font-family:var(--mono); font-size:1.02rem; font-weight:700; color:var(--ink);
+  letter-spacing:-0.01em; margin:0 0 .45rem}
+.specs{list-style:none; margin:.85rem 0 0; padding:0; display:grid; gap:.5rem}
+.specs li{position:relative; padding-left:1.15rem; font-size:1.02rem; line-height:1.6; color:var(--dim)}
+.specs li::before{content:""; position:absolute; left:0; top:.66em; width:5px; height:5px;
+  border-radius:1px; background:var(--accent)}
+.specs b{font-family:var(--display); font-weight:600; font-size:.94em; color:var(--ink)}
+.specs em{font-style:normal; font-weight:600; color:var(--ink)}
+.specs .sub{list-style:none; margin:.45rem 0 0; padding:0; display:grid; gap:.35rem}
+.specs .sub li{padding-left:1.15rem; font-size:.97rem}
+.specs .sub li::before{width:6px; height:1px; border-radius:0; background:var(--line-2); top:.85em}
+.stage-block .fig{margin-top:1.15rem}
+
+.viewer-hint{font-size:.98rem; color:var(--faint); margin-top:1rem; font-style:italic}
+/* three statement boxes, side by side */
+.claims{display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:1.1rem}
+.claim{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:1.2rem 1.35rem;
+  border-top:2px solid var(--accent)}
+.claim h3{font-size:1.06rem; font-weight:600; margin-bottom:.35rem}
+.claim h3 em{font-style:italic; color:var(--accent)}
+.claim p{font-size:.98rem; line-height:1.66}
+@media(max-width:880px){.claims{grid-template-columns:1fr}}
+
+
+/* ═══════════════ controls ═══════════════ */
+.controls{display:flex; flex-wrap:wrap; align-items:center; gap:.55rem .8rem; margin:1.1rem 0 .75rem}
+.seg-label{font-family:var(--mono); font-size:.72rem; font-weight:400; letter-spacing:.06em; text-transform:uppercase; color:var(--faint)}
+.seg{display:inline-flex; flex-wrap:wrap; gap:3px; background:var(--bg-2); border:1px solid var(--line); border-radius:9px; padding:3px}
+.seg button{font-family:var(--mono); font-size:.8rem; padding:.46rem .85rem; border-radius:6px; border:none; background:transparent; color:var(--dim); cursor:pointer; display:inline-flex; align-items:center; gap:.45em; transition:.15s}
+.seg button:hover{color:var(--ink)}
+.seg button.active{background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(27,26,23,.09)}
+.seg .dot{width:7px; height:7px; border-radius:2px; opacity:.5; flex:0 0 7px}
+.seg button.active .dot{opacity:1}
+
+/* ═══════════════ viewer (white card on paper) ═══════════════ */
+.viewer{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:20px}
+.stage{display:grid; grid-template-columns:repeat(var(--cols,2),minmax(0,1fr)); gap:12px}
+.stage.unc{grid-template-columns:repeat(6,minmax(0,1fr))}
+.stage.unc .u1{grid-column:1/3} .stage.unc .u2{grid-column:3/5} .stage.unc .u3{grid-column:5/7}
+.stage.unc .u4{grid-column:1/4} .stage.unc .u5{grid-column:4/7}
+@media(max-width:900px){
+  .stage.unc{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stage.unc .u1,.stage.unc .u2,.stage.unc .u3,.stage.unc .u4,.stage.unc .u5{grid-column:auto}
+  .stage.unc .u3{grid-column:1/-1}
+}
+.ack{max-width:none}
+.ack p{font-size:.8rem; line-height:1.6; color:var(--faint)}
+.ack-key{font-family:var(--mono); font-weight:700; color:var(--dim); margin-right:.15em}
+.ack p+p{margin-top:.6rem}
+#ack{padding-bottom:3rem}
+.ack em{font-style:italic; color:var(--dim)}
+
+.jet-key{display:inline-flex; align-items:center; gap:.4rem; margin-left:auto; font-weight:400;
+  font-family:var(--mono); font-size:.7rem; color:var(--faint)}
+.jet-key .jet{flex:0 0 110px; height:7px; border-radius:2px; border:1px solid var(--line);
+  background:linear-gradient(90deg,#00007f,#0000ff,#007fff,#00ffff,#7fff7f,#ffff00,#ff7f00,#ff0000,#7f0000)}
+.stage.abl{grid-template-columns:.52fr 1fr 1fr; align-items:start}
+.stage.abl .refs{display:grid; gap:12px; min-width:0}
+.pane.sm figcaption{font-size:.68rem; margin-top:.4rem}
+@media(max-width:900px){
+  .stage.abl{grid-template-columns:1fr 1fr}
+  .stage.abl .refs{grid-column:1 / -1; grid-template-columns:1fr 1fr}
+}
+.pane{margin:0; position:relative; min-width:0}
+.pane video,.pane img{width:100%; border-radius:7px; background:#111; display:block; aspect-ratio:832/480; object-fit:cover}
+.stage.abl .pane video,.stage.unc .pane video{aspect-ratio:16/9}
+.pane figcaption{font-family:var(--mono); font-size:.78rem; color:var(--dim); margin-top:.55rem; display:flex; align-items:center; gap:.5em}
+.pane figcaption .k{width:7px; height:7px; border-radius:2px; background:var(--faint); flex:0 0 7px}
+.pane.ours figcaption{color:var(--accent); font-weight:500} .pane.ours figcaption .k{background:var(--accent)}
+.pane.bad figcaption{color:var(--flaw); font-weight:500} .pane.bad figcaption .k{background:var(--flaw)}
+.pane figcaption{flex-wrap:wrap} .pane figcaption .sub-cap,.block__title .sub-cap{font-weight:400; color:var(--faint)}
+
+.stage[data-mode="wipe"]{display:block; position:relative; cursor:ew-resize; user-select:none; touch-action:none; border-radius:7px; overflow:hidden;
+  max-width:calc(72% - 6px); margin-left:auto; margin-right:auto}   /* wider than one pane, still well short of full-bleed */
+@media(max-width:880px){.stage[data-mode="wipe"]{max-width:none}}
+/* let the card hug the media in wipe mode instead of leaving it adrift */
+.viewer:has(.stage[data-mode="wipe"]){max-width:calc(72% + 34px); margin-left:auto; margin-right:auto}
+.viewer:has(.stage[data-mode="wipe"]) .stage{max-width:none}
+@media(max-width:880px){.viewer:has(.stage[data-mode="wipe"]){max-width:none}}
+.stage[data-mode="wipe"] .pane video{border-radius:0; -webkit-user-drag:none}
+.stage[data-mode="wipe"] .pane-b{position:absolute; inset:0; clip-path:inset(0 0 0 var(--wipe,50%))}
+.stage[data-mode="wipe"] .pane-b video{height:100%; object-fit:cover}
+.stage[data-mode="wipe"] figcaption{position:absolute; bottom:12px; margin:0; padding:.34rem .68rem; border-radius:6px; background:rgba(250,249,246,.93); font-size:.74rem; pointer-events:none}
+.stage[data-mode="wipe"] .pane-a figcaption{left:12px}
+.stage[data-mode="wipe"] .pane-b figcaption{right:12px}
+.wipe-grip{display:none}
+.stage[data-mode="wipe"] .wipe-grip{display:block; position:absolute; top:0; bottom:0; left:var(--wipe,50%); width:3px;
+  background:#fff; box-shadow:0 0 0 1px rgba(0,0,0,.42); transform:translateX(-1.5px); pointer-events:none}
+.stage[data-mode="wipe"] .wipe-grip::after{content:""; position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%); width:36px; height:36px; border-radius:50%;
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231a1a18' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 8 6 12l4 4M14 8l4 4-4 4'/%3E%3C/svg%3E") center/18px 18px no-repeat;
+  box-shadow:0 2px 12px rgba(0,0,0,.34)}
+
+.transport{display:flex; align-items:center; gap:.55rem; margin-top:.8rem;
+  padding:.34rem .6rem; border-radius:999px; background:var(--bg-2); border:1px solid var(--line);
+  font-family:var(--mono); font-size:.72rem; color:var(--dim)}
+.transport button{font-family:var(--mono); font-size:.78rem; padding:.38rem .78rem; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--dim); cursor:pointer; white-space:nowrap; transition:.15s}
+.transport button:hover{color:var(--ink)}
+.transport button.t-play,.transport button.t-restart{flex:0 0 auto; width:31px; height:31px; padding:0;
+  border-radius:50%; display:grid; place-items:center}
+.transport button.t-play{background:var(--ink); color:var(--bg)}
+.transport button.t-play:hover{background:var(--accent); color:#fff}
+.transport button.t-restart:hover{background:var(--line)}
+.t-play .ico{width:15px; height:15px; fill:currentColor}
+.t-restart .ico{width:16px; height:16px; fill:currentColor}
+.t-restart .ico-stroke{fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round}
+.t-play .ico-play{display:none}
+.t-play.is-paused .ico-pause{display:none}
+.t-play.is-paused .ico-play{display:block}
+.transport button.t-rate{padding:.24rem .6rem; border-radius:999px; min-width:40px;
+  border:1px solid var(--line-2); background:var(--card)}
+.transport button.t-rate:hover{border-color:var(--accent); color:var(--accent)}
+.t-seek{flex:1; min-width:70px; -webkit-appearance:none; appearance:none; height:4px; border-radius:999px; cursor:pointer;
+  background:linear-gradient(to right, var(--accent) 0 var(--p,0%), var(--line-2) var(--p,0%) 100%)}
+.t-seek::-webkit-slider-thumb{-webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:#fff; border:2.5px solid var(--accent)}
+.t-seek::-moz-range-thumb{width:13px; height:13px; border-radius:50%; background:#fff; border:2.5px solid var(--accent)}
+.t-time{font-variant-numeric:tabular-nums; color:var(--faint); min-width:84px; text-align:right}
+@media(max-width:640px){.t-time{display:none}}
+
+.caption{font-family:var(--mono); font-size:.7rem; line-height:1.7; color:var(--faint); margin-top:.85rem}
+.keystrip{display:grid; grid-template-columns:repeat(6,1fr); gap:2px; border-radius:7px; overflow:hidden; margin-top:.9rem; background:var(--line)}
+.keystrip img{width:100%; aspect-ratio:832/480; object-fit:cover; background:#111}
+
+/* ═══════════════ figures ═══════════════ */
+.fig{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:18px; margin-top:1.15rem}
+.fig--live{background:none; border:none; padding:0}
+.fig-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--r)}
+.stage1-embed,.stage2-embed{width:100%; min-width:720px; border:0; display:block; border-radius:var(--r)}
+.stage1-embed{aspect-ratio:1600/402}
+.stage2-embed{aspect-ratio:1600/398}
+.fig img{width:100%; border-radius:6px}
+.fig figcaption{font-size:.92rem; color:var(--dim); margin-top:.85rem; line-height:1.62}
+.fig figcaption b{font-family:var(--body); font-style:italic; font-size:1em; font-weight:600; letter-spacing:0; text-transform:none; color:var(--accent); margin-right:.4em}
+
+/* ═══════════════ bibtex ═══════════════ */
+.cite{position:relative; background:var(--card); border:1px solid var(--line); border-radius:var(--r); margin-top:1.4rem; overflow:hidden}
+.cite pre{margin:0; padding:1.25rem 3.6rem 1.25rem 1.25rem; font-family:var(--mono); font-size:.84rem; line-height:1.75; color:var(--ink); overflow-x:auto}
+.cite-copy{position:absolute; top:.75rem; right:.75rem; font-family:var(--mono); font-size:.68rem; padding:.34rem .6rem; border-radius:6px; border:1px solid var(--line-2); background:var(--bg); color:var(--dim); cursor:pointer}
+.cite-copy:hover{border-color:var(--accent); color:var(--accent)}
+.cite-copy.done{border-color:var(--accent); color:var(--accent); background:var(--accent-soft)}
+@media(max-width:640px){.cite pre{padding-top:2.6rem; padding-right:1.25rem}}
+
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a class="topnav__brand" href="#top">
+      <span class="motif" style="color:var(--ink)" aria-hidden="true">
+        <svg width="17" height="17" viewBox="0 0 24 24">
+          <g class="j2"><rect x="2" y="2" width="5" height="5" rx="1"/></g>
+          <g><rect x="9.5" y="2" width="5" height="5" rx="1"/></g>
+          <g class="j1"><rect x="17" y="2" width="5" height="5" rx="1"/></g>
+          <g><rect x="2" y="9.5" width="5" height="5" rx="1"/></g>
+          <g class="j3"><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></g>
+          <g><rect x="17" y="9.5" width="5" height="5" rx="1"/></g>
+          <g class="j1"><rect x="2" y="17" width="5" height="5" rx="1"/></g>
+          <g class="j2"><rect x="9.5" y="17" width="5" height="5" rx="1"/></g>
+          <g><rect x="17" y="17" width="5" height="5" rx="1"/></g>
+        </svg>
+      </span>
+      FixAnything
+    </a>
+    <div class="topnav__links">
+      <a href="#overview">Overview</a>
+      <a href="#method">Method</a>
+      <a href="#ablations">Ablations</a>
+      <a href="#results">Results</a>
+      <a href="#uncertainty">Uncertainty</a>
+      <a href="#bibtex">BibTeX</a>
+    </div>
+    <a class="topnav__cta" href="paper.pdf">Paper</a>
+  </div>
+</nav>
+
+<!-- ═══════════ HERO ═══════════ -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1 class="hero__title"><span class="name">FixAnything:</span> 3D-Consistent Rendering Refinement via Video Generative Priors</h1>
+
+    <div class="authors">
+      <a href="https://www.khiemvuong.com/">Khiem&nbsp;Vuong</a>,
+      <a href="https://www.cs.cmu.edu/~deva/">Deva&nbsp;Ramanan</a><sup class="eq">*</sup>,
+      <a href="https://www.cs.cmu.edu/~srinivas/">Srinivasa&nbsp;Narasimhan</a><sup class="eq">*</sup>
+    </div>
+    <div class="affil">Carnegie Mellon University</div>
+    <div class="eqnote">(* denotes equal contribution / advising)</div>
+    <div class="venue">European Conference on Computer Vision (ECCV) 2026</div>
+
+    <div class="hero__links">
+      <a href="paper.pdf"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>Paper</a>
+      <a href="#" data-todo="arxiv"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 12h8"/></svg>arXiv</a>
+      <a href="#" data-todo="code"><svg viewBox="0 0 24 24"><path d="m9 18-6-6 6-6"/><path d="m15 6 6 6-6 6"/></svg>Code</a>
+      <a href="#bibtex"><svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>BibTeX</a>
+    </div>
+
+  </div>
+</header>
+
+<!-- ═══════════ 01 OVERVIEW ═══════════ -->
+<section id="overview" style="border-top:none; padding-top:30px">
+  <div class="container">
+    <div class="callout">
+      <span class="lbl">TL;DR</span>
+      A single generalist video model that repairs rendering artifacts from <em>any</em> 3D representation &mdash;
+      <b>3DGS, NeRF, mesh, or sparse point clouds</b> &mdash; by repurposing a pretrained video diffusion model with
+      <b>minimal modification and finetuning</b>.
+    </div>
+
+    <div class="claims">
+      <div class="claim">
+        <h3>(Degraded) render <em>is</em> camera control</h3>
+        <p>Every representation has its own artifacts — yet the render still preserves the <b>camera trajectory
+          and coarse scene layout</b>, providing the control signal.</p>
+      </div>
+      <div class="claim">
+        <h3>A (very sparse) point cloud is enough</h3>
+        <p>Even a very sparse point cloud (e.g., from COLMAP) gives the video model effective camera control, with only
+          <b>minimal LoRA finetuning</b> on <b> ~ 20 paired videos</b>.</p>
+      </div>
+      <div class="claim">
+        <h3>Pose accuracy <em>as</em> the reward for DPO</h3>
+        <p>Camera poses recovered by COLMAP from each output serve as the <b>reward</b>; Flow-DPO then steers the
+          model toward <b>geometrically consistent</b> outputs.</p>
+      </div>
+    </div>
+
+    <p class="viewer-hint">Switch representation below, or use <b>Slider</b> to drag a seam between the input render and
+      the repaired output — same frame, same camera trajectory.</p>
+
+    <div class="controls">
+      <span class="seg-label">Representation</span>
+      <div class="seg" data-group="teaser-repr">
+        <button data-v="3dgs"><span class="dot" style="background:var(--gs)"></span>3DGS</button>
+        <button data-v="nerf"><span class="dot" style="background:var(--nerf)"></span>NeRF</button>
+        <button data-v="mesh"><span class="dot" style="background:var(--mesh)"></span>Mesh</button>
+        <button class="active" data-v="colmap"><span class="dot" style="background:var(--pts)"></span>Sparse points</button>
+      </div>
+      <div style="flex:1"></div>
+      <div class="seg" data-group="teaser-mode">
+        <button class="active mode-btn" data-mode="side">Side-by-side</button>
+        <button class="mode-btn" data-mode="wipe">Slider</button>
+      </div>
+    </div>
+
+    <div class="viewer" id="v-teaser">
+      <div class="stage" data-mode="side" style="--cols:2">
+        <figure class="pane pane-a"><video id="teaser-in" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span><span data-label="in">Sparse-point input</span></figcaption></figure>
+        <figure class="pane pane-b ours"><video id="teaser-out" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span><span data-label="out">FixAnything Output</span></figcaption></figure>
+        <div class="wipe-grip"></div>
+      </div>
+      <div class="transport">
+        <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+        <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+        <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub both videos">
+        <button class="t-rate">1×</button>
+        <span class="t-time">0.0 / 0.0s</span>
+      </div>
+
+      <div class="anchors" id="teaser-anchors">
+        <div class="anchors__rule"><span class="anchors__title" id="anchors-title">Sparse-point input video, unrolled</span></div>
+        <div class="anchor-row">
+          <figure class="anchor clean">
+            <img id="anchor-first" src="anchors/colmap_first.jpg" alt="First frame: a clean view">
+            <figcaption>Frame 1 &middot; clean view</figcaption>
+          </figure>
+          <span class="anchor-dots">· · ·</span>
+          <figure class="anchor">
+            <img id="anchor-mid" src="anchors/colmap_mid.jpg" alt="Middle frame: the degraded render">
+            <figcaption id="anchor-mid-cap">Frame 40 &middot; point-cloud render</figcaption>
+          </figure>
+          <span class="anchor-dots">· · ·</span>
+          <figure class="anchor clean">
+            <img id="anchor-last" src="anchors/colmap_last.jpg" alt="Last frame: a clean view">
+            <figcaption>Frame 65 &middot; clean view</figcaption>
+          </figure>
+        </div>
+        <p class="caption">Clean training views the trajectory passes through — the model treats these as anchors
+          and propagates appearance, lighting and scene structure into the degraded frames in between.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════ 01 METHOD ═══════════ -->
+<section id="method">
+  <div class="container">
+    <div class="sec-head"><span class="sec-chip"><span class="no">01.</span> Method</span></div>
+    <div class="prose-wide">
+      <p>Rendering from 3DGS, NeRF, meshes or point clouds produces artifacts whenever input views are sparse or
+        the target view lies far from them. FixAnything poses the fix as <b>video-to-video translation</b> and adapts
+        a pretrained video diffusion model (Wan2.1-I2V-14B) in two stages:
+        </p>
+    </div>
+
+    <div class="stage-block">
+      <h3 class="stage-title">Stage I &mdash; Supervised finetuning</h3>
+      <ul class="specs">
+        <li><b>Conditioning</b> — the degraded render's VAE latent is channel-concatenated with the noisy latent,
+          together with a per-frame binary mask marking which frames to <em>trust</em> and which to <em>fix</em>.</li>
+        <li><b>Data</b> — paired videos from DL3DV-10K, rendered from all four representations and trained <em>jointly</em> as one model.</li>
+        <li><b>Training</b> — a <em>rank-64 LoRA adapter</em> (< 1% of parameters), 3000 iterations on a single
+          H100; as few as 20 paired videos suffice.</li>
+      </ul>
+      <figure class="fig fig--live">
+        <div class="fig-scroll"><iframe class="stage1-embed" src="stage1.html?embed=1" scrolling="no" loading="lazy" title="Stage I — supervised finetuning, animated"></iframe></div>
+      </figure>
+    </div>
+
+    <div class="stage-block">
+      <h3 class="stage-title">Stage II &mdash; Geometry-aware preference optimization</h3>
+      <ul class="specs">
+        <li><b>Motivation</b> — the model sometimes hallucinates structures that look plausible per frame but are
+          inconsistent across views.</li>
+        <li><b>Reward</b> — how accurately COLMAP recovers the output video's camera poses (AUC@5° against the
+          input poses).</li>
+        <li><b>Flow-DPO</b> — several rollouts are sampled per scene, ranked by this reward, and paired higher-against-lower
+          (AUC gap &ge; 0.2); Flow-DPO then finetunes the LoRA on these pairs, improving pose accuracy from
+          <em>61.1 to 68.3 AUC@5°</em> with no additional inference cost.</li>
+      </ul>
+      <figure class="fig fig--live">
+        <div class="fig-scroll"><iframe class="stage2-embed" src="stage2.html?embed=1" scrolling="no" loading="lazy" title="Stage II — geometry-aware preference optimization, animated"></iframe></div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 02 ABLATIONS ═══════════ -->
+<section id="ablations">
+  <div class="container">
+    <div class="sec-head"><span class="sec-chip"><span class="no">02.</span> Ablations</span></div>
+
+    <div style="margin-top:2.2rem">
+      <div class="block">
+        <h3 class="block__title">Geometry-aware preference optimization</h3>
+        <p class="block__lead">Without DPO, some seeds hallucinate structure that shifts from frame to frame and breaks
+          3D consistency. Ranking rollouts by <b>recovered camera-pose accuracy</b> steers generation toward
+          geometrically faithful outputs.</p>
+        <div class="viewer" id="v-dpo" style="margin-top:1.1rem">
+          <div class="stage abl">
+            <div class="refs">
+              <figure class="pane sm"><video muted loop playsinline preload="metadata" data-src="figs/ablation/input.mp4"></video><figcaption><span class="k"></span>Input</figcaption></figure>
+              <figure class="pane sm"><video muted loop playsinline preload="metadata" data-src="figs/ablation/gt.mp4"></video><figcaption><span class="k"></span>Ground truth</figcaption></figure>
+            </div>
+            <figure class="pane bad"><video muted loop playsinline preload="metadata" data-src="figs/ablation/before_dpo.mp4"></video><figcaption><span class="k"></span>Before DPO <span class="sub-cap">(hallucinated tree-like structure breaks geometric consistency)</span></figcaption></figure>
+            <figure class="pane ours"><video muted loop playsinline preload="metadata" data-src="figs/ablation/after_dpo.mp4"></video><figcaption><span class="k"></span>After DPO</figcaption></figure>
+          </div>
+          <div class="transport">
+            <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+            <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+            <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub all four videos">
+            <button class="t-rate">1×</button>
+            <span class="t-time">0.0 / 0.0s</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="block" id="mask">
+        <h3 class="block__title">Mask-aware conditioning</h3>
+        <p class="block__lead">Without the mask, the model cannot tell clean frames from mildly degraded ones and
+          hallucinates over the training views. With it, those frames are preserved and serve as anchors for the
+          frames around them.</p>
+        <div class="viewer" id="v-mask" style="margin-top:1.1rem">
+          <div class="stage abl">
+            <div class="refs">
+              <figure class="pane sm"><video muted loop playsinline preload="metadata" data-src="assets/mask_cond/input.mp4"></video><figcaption><span class="k"></span>Input</figcaption></figure>
+              <figure class="pane sm"><video muted loop playsinline preload="metadata" data-src="assets/mask_cond/gt.mp4"></video><figcaption><span class="k"></span>Ground truth</figcaption></figure>
+            </div>
+            <figure class="pane bad"><video muted loop playsinline preload="metadata" data-src="assets/mask_cond/no_mask.mp4"></video><figcaption><span class="k"></span>Without mask <span class="sub-cap">(note the missing wet-floor sign, which also corrupts nearby frames)</span></figcaption></figure>
+            <figure class="pane ours"><video muted loop playsinline preload="metadata" data-src="assets/mask_cond/with_mask.mp4"></video><figcaption><span class="k"></span>With mask</figcaption></figure>
+          </div>
+          <div class="transport">
+            <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+            <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+            <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub all four videos">
+            <button class="t-rate">1×</button>
+            <span class="t-time">0.0 / 0.0s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 03 RESULTS ═══════════ -->
+<section id="results">
+  <div class="container">
+    <div class="sec-head"><span class="sec-chip"><span class="no">03.</span> Results</span></div>
+
+    <div style="margin-top:2.2rem">
+      <div class="block" id="dl3dv">
+        <h3 class="block__title">DL3DV</h3>
+
+
+      <div class="controls">
+        <span class="seg-label">Scene</span>
+        <div class="seg" data-group="eval-scene">
+          <button class="active" data-v="0850228c_train_cam_06_clip_03">01</button>
+          <button data-v="0a78c25f_train_cam_06_clip_03">02</button>
+          <button data-v="9daa05c4_train_cam_06_clip_02">03</button>
+          <button data-v="25f7dbc1_train_cam_06_clip_01">04</button>
+        </div>
+        <span class="seg-label">Representation</span>
+        <div class="seg" data-group="eval-repr">
+          <button class="active" data-v="gsplat"><span class="dot" style="background:var(--gs)"></span>3DGS</button>
+          <button data-v="mesh"><span class="dot" style="background:var(--mesh)"></span>Mesh</button>
+          <button data-v="colmap"><span class="dot" style="background:var(--pts)"></span>Sparse points</button>
+        </div>
+        <div style="flex:1"></div>
+        <div class="seg" data-group="eval-mode">
+          <button class="active mode-btn" data-mode="side">Side-by-side</button>
+          <button class="mode-btn" data-mode="wipe">Slider</button>
+        </div>
+      </div>
+
+      <div class="viewer" id="v-eval">
+        <div class="stage" data-mode="side" style="--cols:2">
+          <figure class="pane pane-a"><video id="eval-in" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span><span data-label="in">3DGS input</span></figcaption></figure>
+          <figure class="pane pane-b ours"><video id="eval-out" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span><span data-label="out">FixAnything Output</span></figcaption></figure>
+          <div class="wipe-grip"></div>
+        </div>
+        <div class="transport">
+          <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+          <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+          <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub both videos">
+          <button class="t-rate">1×</button>
+          <span class="t-time">0.0 / 0.0s</span>
+        </div>
+      </div>
+      </div>
+
+      <div class="block" id="drone">
+        <h3 class="block__title">DL3DV-Drone</h3>
+        <p class="block__lead">Additional aerial DL3DV scenes with long trajectories. Trajectories longer than 61
+          frames are processed in overlapping chunks that share a clean anchor at each boundary.</p>
+
+      <div class="controls">
+        <span class="seg-label">Scene</span>
+        <div class="seg" data-group="drone-scene">
+          <button class="active" data-v="15383a1">01</button>
+          <button data-v="037010c">02</button>
+          <button data-v="0caa2cf">03</button>
+          <button data-v="971fb09">04</button>
+        </div>
+        <span class="seg-label">Representation</span>
+        <div class="seg" data-group="drone-repr">
+          <button class="active" data-v="gsplat"><span class="dot" style="background:var(--gs)"></span>3DGS</button>
+          <button data-v="colmap_pcd"><span class="dot" style="background:var(--pts)"></span>Sparse points</button>
+        </div>
+        <div style="flex:1"></div>
+        <div class="seg" data-group="drone-mode">
+          <button class="active mode-btn" data-mode="side">Side-by-side</button>
+          <button class="mode-btn" data-mode="wipe">Slider</button>
+        </div>
+      </div>
+
+      <div class="viewer" id="v-drone">
+        <div class="stage" data-mode="side" style="--cols:2">
+          <figure class="pane pane-a"><video id="drone-in" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span><span data-label="in">3DGS input</span></figcaption></figure>
+          <figure class="pane pane-b ours"><video id="drone-out" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span>FixAnything Output</figcaption></figure>
+          <div class="wipe-grip"></div>
+        </div>
+        <div class="transport">
+          <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+          <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+          <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub both videos">
+          <button class="t-rate">1×</button>
+          <span class="t-time">0.0 / 0.0s</span>
+        </div>
+        <div class="keystrip" id="drone-keys">
+          <img alt="clean anchor view"><img alt="clean anchor view"><img alt="clean anchor view">
+          <img alt="clean anchor view"><img alt="clean anchor view"><img alt="clean anchor view">
+        </div>
+        <p class="caption">Clean training views the trajectory passes through. The model treats these as anchors and
+          propagates appearance, lighting and scene structure into the degraded frames in between.</p>
+      </div>
+      </div>
+
+      <div class="block" id="mipnerf">
+        <h3 class="block__title">MipNeRF-360 <span class="sub-cap">(cross-dataset generalization)</span></h3>
+
+      <div class="controls">
+        <span class="seg-label">Scene</span>
+        <div class="seg" data-group="mip-scene">
+          <button class="active" data-v="counter">Counter</button>
+          <button data-v="room">Room</button>
+          <button data-v="bonsai">Bonsai</button>
+          <button data-v="garden">Garden</button>
+          <button data-v="bicycle">Bicycle</button>
+          <button data-v="treehill">Treehill</button>
+        </div>
+        <div style="flex:1"></div>
+        <div class="seg" data-group="mip-mode">
+          <button class="active mode-btn" data-mode="side">Side-by-side</button>
+          <button class="mode-btn" data-mode="wipe">Slider</button>
+        </div>
+      </div>
+
+      <div class="viewer" id="v-mip">
+        <div class="stage" data-mode="side" style="--cols:2">
+          <figure class="pane pane-a"><video id="mip-in" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span>3DGS input</figcaption></figure>
+          <figure class="pane pane-b ours"><video id="mip-out" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span>FixAnything Output</figcaption></figure>
+          <div class="wipe-grip"></div>
+        </div>
+        <div class="transport">
+          <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+          <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+          <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub both videos">
+          <button class="t-rate">1×</button>
+          <span class="t-time">0.0 / 0.0s</span>
+        </div>
+      </div>
+      </div>
+
+      <div class="block" id="llff">
+        <h3 class="block__title">LLFF <span class="sub-cap">(cross-dataset generalization)</span></h3>
+
+      <div class="controls">
+        <span class="seg-label">Scene</span>
+        <div class="seg" data-group="llff-scene">
+          <button class="active" data-v="trex">Trex</button>
+          <button data-v="room">Room</button>
+          <button data-v="horns">Horns</button>
+          <button data-v="fern">Fern</button>
+          <button data-v="orchids">Orchids</button>
+        </div>
+        <div style="flex:1"></div>
+        <div class="seg" data-group="llff-mode">
+          <button class="active mode-btn" data-mode="side">Side-by-side</button>
+          <button class="mode-btn" data-mode="wipe">Slider</button>
+        </div>
+      </div>
+
+      <div class="viewer" id="v-llff">
+        <div class="stage" data-mode="side" style="--cols:2">
+          <figure class="pane pane-a"><video id="llff-in" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span>3DGS input</figcaption></figure>
+          <figure class="pane pane-b ours"><video id="llff-out" muted loop playsinline preload="metadata"></video><figcaption><span class="k"></span>FixAnything Output</figcaption></figure>
+          <div class="wipe-grip"></div>
+        </div>
+        <div class="transport">
+          <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+          <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+          <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub both videos">
+          <button class="t-rate">1×</button>
+          <span class="t-time">0.0 / 0.0s</span>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 04 DISCUSSION ═══════════ -->
+<section id="uncertainty">
+  <div class="container">
+    <div class="sec-head"><span class="sec-chip"><span class="no">04.</span> Can we tell where the model is hallucinating?</span></div>
+
+    <ul class="specs">
+      <li><b>Uncertainty estimate</b> — as a preliminary analysis, we run inference five times with different random
+        seeds and take the per-pixel standard deviation as an uncertainty estimate.</li>
+      <li><b>Strong correlation with error</b> — uncertainty is low where the model confidently propagates input
+        texture (sky, ground) and high where several completions are plausible (buildings), closely tracking
+        reconstruction error: on DL3DV with six views, mean PSNR is <em>25.7 dB</em> over the most-confident 25% of
+        pixels versus <em>14.4 dB</em> over the least-confident 25%.</li>
+    </ul>
+
+    <div class="viewer" id="v-unc">
+      <div class="stage unc">
+        <figure class="pane u1"><video muted loop playsinline preload="metadata" data-src="figs/uncertainty/input.mp4"></video><figcaption><span class="k"></span>Mesh input</figcaption></figure>
+        <figure class="pane u2 ours"><video muted loop playsinline preload="metadata" data-src="figs/uncertainty/output.mp4"></video><figcaption><span class="k"></span>FixAnything output (seed 1)</figcaption></figure>
+        <figure class="pane u3"><video muted loop playsinline preload="metadata" data-src="figs/uncertainty/gt.mp4"></video><figcaption><span class="k"></span>Ground truth</figcaption></figure>
+        <figure class="pane u4"><video muted loop playsinline preload="metadata" data-src="figs/uncertainty/error.mp4"></video><figcaption><span class="k"></span>Error &nbsp;|output &minus; GT|</figcaption></figure>
+        <figure class="pane u5"><video muted loop playsinline preload="metadata" data-src="figs/uncertainty/uncertainty.mp4"></video><figcaption><span class="k"></span>Uncertainty &nbsp;std over 5 seeds<span class="jet-key"><span>low</span><i class="jet"></i><span>high</span></span></figcaption></figure>
+      </div>
+        <div class="transport">
+          <button class="t-play" aria-label="Pause"><svg class="ico ico-pause" viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.1"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.1"/></svg><svg class="ico ico-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button>
+          <button class="t-restart" aria-label="Restart"><svg class="ico ico-stroke" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg></button>
+          <input class="t-seek" type="range" min="0" max="1000" value="0" aria-label="Scrub all five videos">
+          <button class="t-rate">1×</button>
+          <span class="t-time">0.0 / 0.0s</span>
+        </div>
+      </div>
+
+  </div>
+</section>
+
+<!-- ═══════════ 05 BIBTEX ═══════════ -->
+<section id="bibtex">
+  <div class="container">
+    <div class="sec-head"><span class="sec-chip"><span class="no">05.</span> BibTeX</span></div>
+    <div class="cite">
+      <button class="cite-copy">Copy</button>
+      <pre>@inproceedings{vuong2026fixanything,
+  title     = {FixAnything: 3D-Consistent Rendering Refinement via Video Generative Priors},
+  author    = {Vuong, Khiem and Ramanan, Deva and Narasimhan, Srinivasa},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year      = {2026}
+}</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ ACKNOWLEDGEMENTS ═══════════ -->
+<section id="ack">
+  <div class="container">
+    <div class="ack">
+      <p><b class="ack-key">Acknowledgements:</b> We thank Shubham Tulsiani, Nikhil Keetha, Sriram Narayanan, Anurag Ghosh, and other members of Deva's and
+        Srinivas' groups at CMU for their valuable feedback and suggestions at various stages of this project. This work used Bridges-2 at Pittsburgh Supercomputing Center through allocation cis240119p from the Advanced
+        Cyberinfrastructure Coordination Ecosystem: Services &amp; Support (ACCESS) program, which is supported by
+        National Science Foundation grants #2138259, #2138286, #2138307, #2137603, and #2138296. This work was
+        supported by Intelligence Advanced Research Projects Activity (IARPA) via Department of the
+        Interior/Interior Business Center (DOI/IBC) contract number 140D0423C0074. The U.S. Government is authorized
+        to reproduce and distribute reprints for Governmental purposes notwithstanding any copyright annotation
+        thereon. <em>Disclaimer:</em> The views and conclusions contained herein are those of the authors and should not be
+        interpreted as necessarily representing the official policies or endorsements, either expressed or implied,
+        of IARPA, DOI/IBC, or the U.S. Government.
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+"use strict";
+
+/* ───────── synced multi-video viewer with one transport ───────── */
+function Viewer(root){
+  var stage    = root.querySelector('.stage');
+  var videos   = Array.prototype.slice.call(stage.querySelectorAll('video'));
+  var playBtn  = root.querySelector('.t-play');
+  var restart  = root.querySelector('.t-restart');
+  var seek     = root.querySelector('.t-seek');
+  var rateBtn  = root.querySelector('.t-rate');
+  var timeEl   = root.querySelector('.t-time');
+  var rate = 1, paused = false, visible = false, scrubbing = false;
+  var master = videos[0];
+
+  function apply(){
+    var go = visible && !paused;
+    videos.forEach(function(v){
+      v.playbackRate = rate;
+      if (go){ var p = v.play(); if (p && p.catch) p.catch(function(){}); }
+      else v.pause();
+    });
+    playBtn.classList.toggle('is-paused', paused);
+    playBtn.setAttribute('aria-label', paused ? 'Play' : 'Pause');
+  }
+  playBtn.addEventListener('click', function(){ paused = !paused; apply(); });
+  restart.addEventListener('click', function(){
+    videos.forEach(function(v){ try{ v.currentTime = 0; }catch(e){} });
+    paused = false; apply();
+  });
+  rateBtn.addEventListener('click', function(){
+    rate = rate === 1 ? 0.5 : rate === 0.5 ? 0.25 : 1;
+    rateBtn.textContent = (rate === 1 ? '1' : rate === 0.5 ? '0.5' : '0.25') + '×';
+    videos.forEach(function(v){ v.playbackRate = rate; });
+  });
+
+  /* hold playback while the user drags, then resume as they left it */
+  seek.addEventListener('pointerdown', function(){
+    scrubbing = true;
+    videos.forEach(function(v){ v.pause(); });
+  });
+  window.addEventListener('pointerup', function(){
+    if (!scrubbing) return;
+    scrubbing = false;
+    apply();
+  });
+  seek.addEventListener('input', function(){
+    var d = master.duration; if (!d || !isFinite(d)) return;
+    var t = d * (seek.value / 1000);
+    videos.forEach(function(v){ try{ v.currentTime = t; }catch(e){} });
+    paint(t, d);
+  });
+  function paint(t, d){
+    if (timeEl) timeEl.textContent = t.toFixed(1) + ' / ' + d.toFixed(1) + 's';
+    if (seek && d) seek.style.setProperty('--p', (100 * t / d) + '%');
+  }
+  master.addEventListener('timeupdate', function(){
+    var d = master.duration; if (!d || !isFinite(d)) return;
+    if (!scrubbing) seek.value = Math.round(1000 * master.currentTime / d);
+    paint(master.currentTime, d);
+  });
+
+  /* only run what is on screen */
+  if ('IntersectionObserver' in window){
+    new IntersectionObserver(function(es){ visible = es[0].isIntersecting; apply(); },
+      {threshold: 0.12}).observe(root);
+  } else { visible = true; }
+
+  /* fetch nothing until the viewer is within ~one screen of the viewport */
+  var near = false, pending = null;
+  function hydrate(){
+    videos.forEach(function(v){
+      if (v.dataset.src){ v.src = v.dataset.src; v.removeAttribute('data-src'); v.load(); }
+    });
+    if (pending){ var map = pending; pending = null; setSources(map); }
+  }
+  function setSources(map){
+    Object.keys(map).forEach(function(sel){
+      var el = root.querySelector(sel); if (!el) return;
+      if (el.tagName === 'VIDEO'){ el.src = map[sel]; el.load(); } else { el.src = map[sel]; }
+    });
+    paused = false;
+    if (seek) { seek.value = 0; seek.style.setProperty('--p', '0%'); }
+    apply();
+  }
+  if ('IntersectionObserver' in window){
+    var nearObs = new IntersectionObserver(function(es){
+      if (!es[0].isIntersecting) return;
+      near = true; nearObs.disconnect(); hydrate();
+    }, {rootMargin: '800px 0px'});
+    nearObs.observe(root);
+  } else { near = true; hydrate(); }
+
+  /* load a new set of sources and restart everything together */
+  this.load = function(map){
+    if (near) setSources(map); else pending = map;
+  };
+  this.label = function(map){
+    Object.keys(map).forEach(function(sel){
+      var el = root.querySelector(sel); if (el) el.textContent = map[sel];
+    });
+  };
+
+  /* ── wipe mode ── */
+  var grip = stage.querySelector('.wipe-grip');
+  if (grip){
+    var host = root.previousElementSibling; /* the .controls block */
+    var modeBtns = host ? host.querySelectorAll('.mode-btn') : [];
+    Array.prototype.forEach.call(modeBtns, function(b){
+      b.addEventListener('click', function(){
+        Array.prototype.forEach.call(modeBtns, function(x){ x.classList.remove('active'); });
+        b.classList.add('active');
+        stage.dataset.mode = b.dataset.mode;
+      });
+    });
+    var dragging = false;
+    function at(clientX){
+      var r = stage.getBoundingClientRect();
+      var p = Math.max(0, Math.min(100, (clientX - r.left) / r.width * 100));
+      stage.style.setProperty('--wipe', p + '%');
+    }
+    stage.addEventListener('pointerdown', function(e){
+      if (stage.dataset.mode !== 'wipe') return;
+      dragging = true; at(e.clientX); e.preventDefault();
+    });
+    window.addEventListener('pointermove', function(e){ if (dragging) at(e.clientX); });
+    window.addEventListener('pointerup',   function(){ dragging = false; });
+  }
+}
+
+/* ───────── segmented controls ───────── */
+function seg(group, onPick){
+  var box = document.querySelector('.seg[data-group="' + group + '"]');
+  if (!box) return;
+  var btns = box.querySelectorAll('button');
+  Array.prototype.forEach.call(btns, function(b){
+    b.addEventListener('click', function(){
+      Array.prototype.forEach.call(btns, function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      onPick(b.dataset.v);
+    });
+  });
+}
+
+var ANCHORS = {
+  '3dgs':   { title: '3DGS input video, unrolled',         mid: '3DGS render' },
+  'nerf':   { title: 'NeRF input video, unrolled',         mid: 'NeRF render' },
+  'mesh':   { title: 'Mesh input video, unrolled',         mid: 'mesh render' },
+  'colmap': { title: 'Sparse-point input video, unrolled', mid: 'point-cloud render' }
+};
+
+var REPR = { '3dgs':'3DGS', 'nerf':'NeRF', 'mesh':'Mesh', 'colmap':'Sparse-point', 'colmap_pcd':'Sparse-point',
+             'gsplat':'3DGS' };
+
+/* ───────── 01 · teaser ───────── */
+var teaser = new Viewer(document.getElementById('v-teaser'));
+var teaserRepr = 'colmap';
+function loadTeaser(){
+  teaser.load({ '#teaser-in':  'assets/teaser/input_'     + teaserRepr + '.mp4',
+                '#teaser-out': 'assets/teaser/generated_' + teaserRepr + '.mp4' });
+  var A = ANCHORS[teaserRepr];
+  document.getElementById('anchors-title').textContent = A.title;
+  document.getElementById('anchor-mid-cap').innerHTML = 'Frame 40 \u00B7 ' + A.mid;
+  ['first','mid','last'].forEach(function(k){
+    document.getElementById('anchor-' + k).src = 'anchors/' + teaserRepr + '_' + k + '.jpg';
+  });
+  teaser.label({ '[data-label="in"]': REPR[teaserRepr] + ' input',
+                 '[data-label="out"]': 'FixAnything Output' });
+}
+seg('teaser-repr', function(v){ teaserRepr = v; loadTeaser(); });
+loadTeaser();
+
+/* ───────── 04 · DL3DV eval ───────── */
+var evalV = new Viewer(document.getElementById('v-eval'));
+var evalScene = '0850228c_train_cam_06_clip_03', evalRepr = 'gsplat';
+function loadEval(){
+  var base = 'assets/dl3dv_eval/' + evalScene + '/' + evalRepr + '/';
+  evalV.load({ '#eval-in': base + 'input.mp4', '#eval-out': base + 'generated.mp4' });
+  evalV.label({ '[data-label="in"]': REPR[evalRepr] + ' input',
+                '[data-label="out"]': 'FixAnything Output' });
+}
+seg('eval-scene', function(v){ evalScene = v; loadEval(); });
+seg('eval-repr',  function(v){ evalRepr  = v; loadEval(); });
+loadEval();
+
+/* ───────── drone: scene × representation ───────── */
+var droneV = new Viewer(document.getElementById('v-drone'));
+var droneKeys = document.getElementById('drone-keys').querySelectorAll('img');
+var FRAMES = ['0000','0060','0120','0180','0240','0300'];
+var droneScene = '15383a1', droneRepr = 'gsplat';
+function loadDrone(){
+  var b = 'assets/dl3dv_drone/' + droneScene + '/';
+  droneV.load({ '#drone-in': b + droneRepr + '/input.mp4',
+                '#drone-out': b + droneRepr + '/generated.mp4' });
+  droneV.label({ '[data-label="in"]': REPR[droneRepr] + ' input' });
+  Array.prototype.forEach.call(droneKeys, function(img, i){
+    img.src = b + 'keyframes/' + FRAMES[i] + '.jpg';
+  });
+}
+seg('drone-scene', function(v){ droneScene = v; loadDrone(); });
+seg('drone-repr',  function(v){ droneRepr  = v; loadDrone(); });
+loadDrone();
+
+/* ───────── 06 · MipNeRF-360 ───────── */
+var mipV = new Viewer(document.getElementById('v-mip'));
+function loadMip(scene){
+  var b = 'assets/mipnerf360/' + scene + '/';
+  mipV.load({ '#mip-in': b + 'input.mp4', '#mip-out': b + 'generated.mp4' });
+}
+seg('mip-scene', loadMip);
+loadMip('counter');
+
+/* ───────── uncertainty ───────── */
+new Viewer(document.getElementById('v-unc'));
+
+/* ───────── LLFF ───────── */
+var llffV = new Viewer(document.getElementById('v-llff'));
+function loadLlff(scene){
+  var b = 'figs/llff/' + scene + '/';
+  llffV.load({ '#llff-in': b + 'input.mp4', '#llff-out': b + 'generated.mp4' });
+}
+seg('llff-scene', loadLlff);
+loadLlff('trex');
+
+/* ───────── 05 · ablations ───────── */
+new Viewer(document.getElementById('v-dpo'));
+new Viewer(document.getElementById('v-mask'));
+
+/* ───────── nav scroll-spy ───────── */
+var links = Array.prototype.slice.call(document.querySelectorAll('.topnav__links a'));
+var targets = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+function spy(){
+  var y = window.pageYOffset + 140, cur = -1;
+  targets.forEach(function(t, i){
+    if (!t) return;
+    if (t.getBoundingClientRect().top + window.pageYOffset <= y) cur = i;
+  });
+  links.forEach(function(a){ a.classList.remove('on'); });
+  if (cur >= 0) links[cur].classList.add('on');
+}
+window.addEventListener('scroll', spy, {passive:true});
+window.addEventListener('resize', spy);
+spy();
+
+/* ───────── bibtex copy ───────── */
+var copy = document.querySelector('.cite-copy');
+copy.addEventListener('click', function(){
+  var txt = document.querySelector('.cite pre').textContent;
+  navigator.clipboard.writeText(txt).then(function(){
+    copy.textContent = 'Copied'; copy.classList.add('done');
+    setTimeout(function(){ copy.textContent = 'Copy'; copy.classList.remove('done'); }, 1600);
+  });
+});
+
+/* ───────── placeholder links ───────── */
+Array.prototype.forEach.call(document.querySelectorAll('[data-todo]'), function(a){
+  a.addEventListener('click', function(e){ e.preventDefault(); });
+  a.style.opacity = '.45'; a.style.cursor = 'not-allowed';
+  a.title = 'TODO: add ' + a.dataset.todo + ' link';
+});
+})();
+</script>
+
+</body>
+</html>

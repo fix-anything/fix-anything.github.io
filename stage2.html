@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FixAnything — Stage II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="figs/fig.css">
+<style>
+:root{--good:#2f7d4f}
+.pipe{display:flex; align-items:center; justify-content:center; gap:.7cqw}
+.arw{flex:0 0 2.4cqw; margin-top:-2cqw}
+.arw.sm{flex:0 0 2cqw; margin-top:0}
+
+.poses{width:auto; height:8cqw}
+.gtwrap{display:flex; align-items:flex-end; gap:.5cqw}
+.gtwrap .poses{height:10.6cqw}
+.vid.main{width:16cqw}
+.vid.roll{width:12cqw}
+
+.ditbox{width:9.5cqw; height:10cqw; border-radius:6px; background:#fff; border:1px solid var(--line-2);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.4cqw;
+  font-family:var(--display); font-weight:600; font-size:1.72cqw; line-height:1.15; text-align:center}
+.ditbox small{font-family:var(--mono); font-weight:400; font-size:1.12cqw; color:var(--faint)}
+
+.colmap{width:7cqw; height:5.4cqw; border-radius:6px; background:var(--accent-soft);
+  border:1px solid var(--line-2); display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-family:var(--display); font-weight:600; font-size:1.42cqw; line-height:1.1}
+.colmap small{font-family:var(--mono); font-weight:400; font-size:1cqw; color:var(--faint)}
+
+.rolls{display:flex; flex-direction:column; gap:.9cqw}
+.roll{display:flex; align-items:center; gap:.7cqw; padding:.65cqw .8cqw; border-radius:9px;
+  border:1px solid var(--line); background:#fff}
+.roll.good{border-color:rgba(47,125,79,.4); background:rgba(47,125,79,.06)}
+.roll.bad{border-color:rgba(179,64,31,.35); background:rgba(179,64,31,.05)}
+.res{display:flex; align-items:center; gap:.6cqw}
+.verdict{display:flex; flex-direction:column; gap:.25cqw; min-width:13cqw}
+.err{display:flex; align-items:center; gap:.45cqw; font-family:var(--display); font-weight:600;
+  font-size:1.6cqw; line-height:1.2}
+.roll.good .err{color:var(--good)} .roll.bad .err{color:var(--flaw)}
+.mark{width:1.9cqw; height:1.9cqw; flex:0 0 auto}
+.badge{align-self:flex-start; font-family:var(--mono); font-size:1.05cqw; padding:.22cqw .55cqw;
+  border-radius:3px; background:var(--good); color:#fff}
+
+/* left-to-right reveal */
+[data-step]{opacity:0; transform:translateX(-.9cqw); transition:opacity .6s ease, transform .6s ease}
+[data-step].in{opacity:1; transform:none}
+@media (prefers-reduced-motion:reduce){[data-step]{opacity:1; transform:none}}
+
+.sf-foot{display:flex; align-items:center; justify-content:flex-end; gap:2cqw}
+.metric{font-family:var(--display); font-weight:600; font-size:1.85cqw; color:var(--accent); white-space:nowrap}
+.metric small{display:block; font-family:var(--mono); font-weight:400; font-size:1.05cqw; color:var(--faint)}
+</style>
+</head>
+<body>
+
+<div class="stage-fig" id="fig">
+  <button class="sf-pause" id="pause">❚❚ pause</button>
+  <div class="sf-head">
+    <span class="sf-kicker">Stage II —</span><span class="sf-title">Geometry-aware preference optimization</span>
+  </div>
+
+  <div class="pipe">
+
+    <div class="node" data-step>
+      <div class="gtwrap">
+        <img class="poses" src="figs/stage2/poses_gt.png" alt="ground-truth camera trajectory">
+        <div class="vid main"><video src="assets/dpo/input.mp4" muted loop playsinline autoplay preload="auto"></video>
+          <span class="chip">Input</span></div>
+      </div>
+      <div class="cap"><b>GT poses</b> &nbsp;·&nbsp; input video</div>
+    </div>
+
+    <div class="arw" data-step><span class="p"></span></div>
+
+    <div class="node" data-step>
+      <div class="ditbox">Video-DiT<small>after Stage I</small></div>
+      <div class="cap">sample 5 seeds</div>
+    </div>
+
+    <div class="arw" data-step><span class="p" style="animation-delay:.4s"></span></div>
+
+    <div class="node">
+      <div class="rolls">
+
+        <div class="roll good" data-step>
+          <div class="vid roll"><video src="assets/dpo/seed_632382241.mp4" muted loop playsinline autoplay preload="auto"></video>
+            <span class="chip">Seed 1</span></div>
+          <div class="arw sm" data-step></div>
+          <div class="colmap" data-step>COLMAP<small>SfM</small></div>
+          <div class="arw sm" data-step></div>
+          <div class="res" data-step>
+            <img class="poses" src="figs/stage2/poses_good.png" alt="recovered camera trajectory, accurate">
+            <div class="verdict">
+              <span class="err"><svg class="mark" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="var(--good)"/><path d="m7.5 12.4 3.1 3.1 6-6.4" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>small pose error</span>
+              <span class="badge">preferred</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="roll bad" data-step>
+          <div class="vid roll"><video src="assets/dpo/seed_1723827307.mp4" muted loop playsinline autoplay preload="auto"></video>
+            <span class="chip">Seed 2</span></div>
+          <div class="arw sm" data-step></div>
+          <div class="colmap" data-step>COLMAP<small>SfM</small></div>
+          <div class="arw sm" data-step></div>
+          <div class="res" data-step>
+            <img class="poses" src="figs/stage2/poses_bad.png" alt="recovered camera trajectory, drifting">
+            <div class="verdict">
+              <span class="err"><svg class="mark" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="var(--flaw)"/><path d="M8.4 8.4l7.2 7.2M15.6 8.4l-7.2 7.2" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>large pose error</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="cap">rollouts ranked by recovered camera-pose accuracy &nbsp;→&nbsp; <b>Flow-DPO</b></div>
+    </div>
+
+  </div>
+
+  </div>
+</div>
+
+<script>
+if (new URLSearchParams(location.search).get('embed')) document.querySelector('.sf-head').style.display='none';
+
+/* reveal the pipeline left to right, then hold and repeat */
+var steps = Array.prototype.slice.call(document.querySelectorAll('[data-step]'));
+var GAP = 700, HOLD = 3400;
+var timers = [], playing = true;
+
+function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+function cycle(){
+  clearTimers();
+  steps.forEach(function(el){ el.classList.remove('in'); });
+  steps.forEach(function(el, i){
+    timers.push(setTimeout(function(){ el.classList.add('in'); }, 400 + i*GAP));
+  });
+  timers.push(setTimeout(cycle, 400 + steps.length*GAP + HOLD));
+}
+
+var vids = Array.prototype.slice.call(document.querySelectorAll('video'));
+var btn = document.getElementById('pause');
+btn.addEventListener('click', function(){
+  playing = !playing;
+  if (playing){
+    btn.innerHTML = '❚❚ pause';
+    vids.forEach(function(v){ v.play().catch(function(){}); });
+    cycle();
+  } else {
+    btn.innerHTML = '▶ play';
+    clearTimers();
+    vids.forEach(function(v){ v.pause(); });
+    steps.forEach(function(el){ el.classList.add('in'); });   /* settle on the finished figure */
+  }
+});
+cycle();
+
+window.addEventListener('load', function(){
+  var f=document.getElementById('fig');
+  document.title='ratio '+f.offsetWidth+'x'+f.offsetHeight;
+});
+</script>
+</body>
+</html>
