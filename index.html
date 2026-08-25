@@ -602,8 +602,8 @@ section{padding:44px 0; border-top:1px solid var(--line)}
         </div>
         <span class="seg-label">Representation</span>
         <div class="seg" data-group="drone-repr">
-          <button class="active" data-v="gsplat"><span class="dot" style="background:var(--gs)"></span>3DGS</button>
-          <button data-v="colmap_pcd"><span class="dot" style="background:var(--pts)"></span>Sparse points</button>
+          <button data-v="gsplat"><span class="dot" style="background:var(--gs)"></span>3DGS</button>
+          <button class="active" data-v="colmap_pcd"><span class="dot" style="background:var(--pts)"></span>Sparse points</button>
         </div>
         <div style="flex:1"></div>
         <div class="seg" data-group="drone-mode">
@@ -751,7 +751,7 @@ section{padding:44px 0; border-top:1px solid var(--line)}
       <pre>@inproceedings{vuong2026fixanything,
   title     = {FixAnything: 3D-Consistent Rendering Refinement via Video Generative Priors},
   author    = {Vuong, Khiem and Ramanan, Deva and Narasimhan, Srinivasa},
-  booktitle = {European Conference on Computer Vision (ECCV)},
+  booktitle = {European Conference on Computer Vision},
   year      = {2026}
 }</pre>
     </div>
@@ -966,7 +966,7 @@ loadEval();
 var droneV = new Viewer(document.getElementById('v-drone'));
 var droneKeys = document.getElementById('drone-keys').querySelectorAll('img');
 var FRAMES = ['0000','0060','0120','0180','0240','0300'];
-var droneScene = '15383a1', droneRepr = 'gsplat';
+var droneScene = '15383a1', droneRepr = 'colmap_pcd';
 function loadDrone(){
   var b = 'assets/dl3dv_drone/' + droneScene + '/';
   droneV.load({ '#drone-in': b + droneRepr + '/input.mp4',
